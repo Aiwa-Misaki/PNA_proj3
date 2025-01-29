@@ -6,13 +6,13 @@ use std::path::PathBuf;
 pub struct SledKvsEngine {}
 
 impl KvsEngine for SledKvsEngine {
-    fn set(&self, key: String, value: String) -> Result<()> {
+    fn set(&mut self, key: String, value: String) -> Result<()> {
         todo!()
     }
-    fn get(&self, key: String) -> Result<Option<String>> {
+    fn get(&mut self, key: String) -> Result<Option<String>> {
         todo!()
     }
-    fn remove(&self, key: String) -> Result<()> {
+    fn remove(&mut self, key: String) -> Result<()> {
         todo!()
     }
 }

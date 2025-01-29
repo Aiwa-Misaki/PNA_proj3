@@ -1,15 +1,15 @@
 use clap::{Parser, Subcommand};
-use std::env;
 use kvs::engines::kvs::KvStore;
+use std::env;
 
 #[derive(Parser)]
 #[command(version)]
 #[command(propagate_version = true)]
 struct Cli {
-    #[arg(long)]
+    #[arg(long,default_value = "127.0.0.1:4000")]
     addr: Option<String>,
 
-    #[arg(long)]
+    #[arg(long,default_value = "kvs")]
     engine: Option<String>,
 }
 
