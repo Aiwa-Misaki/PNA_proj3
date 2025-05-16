@@ -37,26 +37,24 @@ fn main() {
     let mut kv = KvStore::open(dir.as_path()).unwrap();
 
     // validate arg
-    validate_address(cli.addr.clone(), _log).unwrap_or_else(|_e| {
-        panic!(
-            "connect addr invalid, should be ip:PORT, got {}",
-            cli.addr.clone().unwrap()
-        )
-    });
-
+    match validate_address(cli.addr.clone(), _log) {
+        Ok(()) => {}
+        Err(e) => {
+            println!("invalid ip address: {}, should be IP:PORT", e);
+            Err(e);
+        }
+    }
     // init a TcpStream
     let mut stream = TcpStream::connect(cli.addr.unwrap()).expect("connect failed");
-    stream.write("114514".as_bytes()).expect("write failed");
+    //stream.write("114514".as_bytes()).expect("write failed");
 
     // parse command
     match &cli.command {
         Commands::Set { key, value } => {
-            kv.set(key.clone(), value.clone())
-                .map_err(|e| println!("{}", e))
-                .unwrap();
+            let result = kv.set(key, value);
         }
         Commands::Get { key } => {
-            let result = kv.get(key.clone()).unwrap();
+            let result = kv.get(key).unwrap();
             if result.is_none() {
                 println!("Key not found");
             } else {
@@ -69,6 +67,10 @@ fn main() {
     }
 }
 
+/// Validate if addr is valid IP address.
+///
+/// * `addr`: string to check
+/// * `logger`: logger instance
 fn validate_address(addr: Option<String>, logger: slog::Logger) -> Result<(), String> {
     match addr {
         None => {

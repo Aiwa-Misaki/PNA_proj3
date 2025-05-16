@@ -20,7 +20,6 @@ struct Cli {
 fn main() -> std::io::Result<()> {
     let dir = env::current_dir()?;
     let mut kv = KvStore::open(dir.as_path()).unwrap();
-
     // init logger
     let decorator = slog_term::TermDecorator::new().stderr().build();
     let drain = slog_term::FullFormat::new(decorator).build().fuse();
@@ -49,12 +48,23 @@ fn main() -> std::io::Result<()> {
     // init TCP listener
     let listener = TcpListener::bind(format!("{}:{}", ip, port))?;
     for stream in listener.incoming() {
-        handle_connect(stream?, _log.clone())?
+        let conn_result = handle_connect(stream?, _log.clone());
+        match conn_result {
+            Ok(()) => info!(_log.clone(), "Connected to client successfully."),
+            Err(e) => {
+                error!(_log,"Error connecting to client, error {}", e);
+                return Err(e);
+            }
+        }
     }
     Ok(())
 }
 
-// handler for client request
+
+/// Handle connection from client/
+///
+/// * `stream`: TcpStream
+/// * `logger`: logger instance
 fn handle_connect(stream: TcpStream, logger: slog::Logger) -> std::io::Result<()> {
     let client_addr = stream.peer_addr()?;
 
