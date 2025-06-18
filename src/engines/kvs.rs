@@ -20,16 +20,12 @@ pub struct KvStore {
 }
 
 impl KvStore {
-    /// Set key-value. If key exists, override value.
-    ///
-    /// * `key`: key to set
-    /// * `value`: value to set
-    ///
-    pub fn set(&mut self, key: &String, value: &String) -> Result<()> {
+    /// set map[key]=value; if key in map, then overwrite
+    pub fn set(&mut self, key: String, value: String) -> Result<()> {
         let (offset, length) =
             self.write_value_to_file(self.filepath.clone(), key.clone(), value.clone())?;
 
-        if self.map.insert(key.clone(), (offset, length)) != None {
+        if self.map.insert(key, (offset, length)) != None {
             self.redundant += 1;
         };
 
@@ -38,15 +34,12 @@ impl KvStore {
         Ok(())
     }
 
-
-    /// Get value of the key.
-    ///
-    /// * `key`: key to query
-    pub fn get(&mut self, key: &String) -> Result<Option<String>> {
+    /// get map[key]; if key not in map, then None
+    pub fn get(&mut self, key: String) -> Result<Option<String>> {
         // println!("222{:?}", self.filepath.clone());
-        if self.map.contains_key(key) {
-            let offset = self.map[key].0;
-            let length = self.map[key].1;
+        if self.map.contains_key(&key) {
+            let offset = self.map[&key].0;
+            let length = self.map[&key].1;
 
             self.get_value_from_file(offset, length)
         } else {
@@ -54,10 +47,7 @@ impl KvStore {
         }
     }
 
-
-    /// Remove value of key. Fail if key not exists.
-    ///
-    /// * `key`: key to remove.
+    /// remove k-v pair from map
     pub fn remove(&mut self, key: String) -> Result<()> {
         if !self.map.contains_key(&key) {
             return Err(KvsError::RmKeyError("Key not found".to_string()));
@@ -90,7 +80,8 @@ impl KvStore {
         Ok(())
     }
 
-    /// Read log file to memory hashmap.
+    /// function to read log file and load to hash map in memory
+    /// used both in open and get(?)
     fn read_to_map(&mut self) -> Result<()> {
         self.map.clear();
         if !self.filepath.exists() {
@@ -121,10 +112,8 @@ impl KvStore {
         Ok(())
     }
 
-
-    /// Open and load data file to storage engine.
-    ///
-    /// * `path`: data file path
+    /// open a file in disk as KvStore
+    /// now only record value in map
     pub fn open(path: &Path) -> Result<Self> {
         let filename = "store.log";
         let mut filepath = path.to_path_buf();
@@ -142,11 +131,6 @@ impl KvStore {
         Ok(kv)
     }
 
-    /// Append a key-value tuple to data file on disk.
-    ///
-    /// * `filepath`: path to data file
-    /// * `key`: key to write
-    /// * `value`: value to write
     fn write_value_to_file(
         &self,
         filepath: PathBuf,
@@ -179,10 +163,6 @@ impl KvStore {
         Ok((offset, length))
     }
 
-    /// Read value at given offset from data file.
-    ///
-    /// * `offset`: start offset of record 
-    /// * `length`: length of record in data file
     fn get_value_from_file(&self, offset: u64, length: usize) -> Result<Option<String>> {
         let file = OpenOptions::new()
             .read(true)
@@ -202,7 +182,7 @@ impl KvStore {
         Ok(Some(deserialized.value))
     }
 
-    /// Remove redundant entries in data file if redundancy > 30%.
+    /// compact
     pub fn compact_log(&mut self) {
         if (self.redundant as f32 / self.map.clone().len() as f32) <= 0.3 {
             return;
@@ -247,12 +227,8 @@ enum OpType {
     Remove,
 }
 
+// used to store log in memory
 #[derive(Serialize, Deserialize, Debug)]
-/// In-memory struct log entry
-///
-/// * `op`: operation type, see enum OpType
-/// * `key`: key
-/// * `value`: value
 struct Log {
     op: OpType,
     key: String,

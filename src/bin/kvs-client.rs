@@ -25,36 +25,31 @@ enum Commands {
 }
 
 fn main() {
-    // init logger
-    let decorator = slog_term::TermDecorator::new().stderr().build();
-    let drain = slog_term::FullFormat::new(decorator).build().fuse();
-    let drain = slog_async::Async::new(drain).build().fuse();
-
-    let _log = slog::Logger::root(drain, o!());
-
     let cli = Cli::parse();
     let dir = env::current_dir().unwrap();
     let mut kv = KvStore::open(dir.as_path()).unwrap();
 
     // validate arg
-    match validate_address(cli.addr.clone(), _log) {
-        Ok(()) => {}
-        Err(e) => {
-            println!("invalid ip address: {}, should be IP:PORT", e);
-            Err(e);
-        }
-    }
+    validate_address(cli.addr.clone(), _log).unwrap_or_else(|_e| {
+        panic!(
+            "connect addr invalid, should be ip:PORT, got {}",
+            cli.addr.clone().unwrap()
+        )
+    });
+
     // init a TcpStream
     let mut stream = TcpStream::connect(cli.addr.unwrap()).expect("connect failed");
-    //stream.write("114514".as_bytes()).expect("write failed");
+    stream.write("114514".as_bytes()).expect("write failed");
 
     // parse command
     match &cli.command {
         Commands::Set { key, value } => {
-            let result = kv.set(key, value);
+            kv.set(key.clone(), value.clone())
+                .map_err(|e| println!("{}", e))
+                .unwrap();
         }
         Commands::Get { key } => {
-            let result = kv.get(key).unwrap();
+            let result = kv.get(key.clone()).unwrap();
             if result.is_none() {
                 println!("Key not found");
             } else {
@@ -67,10 +62,6 @@ fn main() {
     }
 }
 
-/// Validate if addr is valid IP address.
-///
-/// * `addr`: string to check
-/// * `logger`: logger instance
 fn validate_address(addr: Option<String>, logger: slog::Logger) -> Result<(), String> {
     match addr {
         None => {
