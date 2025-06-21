@@ -1,8 +1,8 @@
 use clap::ArgAction::Version;
 use clap::{Parser, Subcommand};
+use kvs::common;
 use kvs::engines::kvs::KvStore;
-use slog::*;
-use slog_async;
+use log::{info, log};
 use std::env;
 use std::net::{TcpListener, TcpStream};
 
@@ -23,27 +23,25 @@ fn main() -> std::io::Result<()> {
     // parse command
     let cli = Cli::parse();
 
-    let addr = cli.addr.unwrap();
-    let engine = cli.engine.unwrap();
-
+    let addr = cli.addr;
+    let engine = cli.engine;
 
     // parse IP port
-    let mut sp = addr.split(':');
-    let ip = sp.next().unwrap();
-    let port = sp.next().unwrap().parse::<u32>().unwrap();
+    let socket = common::validate_address(&addr).expect("invalid ip address");
+    let (ip, port) = (socket.ip(), socket.port());
+    info!("config {ip}:{port}, engine {engine}");
 
     // init TCP listener
-    let listener = TcpListener::bind(format!("{}:{}", ip, port))?;
+    let listener = TcpListener::bind(addr)?;
     for stream in listener.incoming() {
-        handle_connect(stream?, _log.clone())?
+        handle_connect(stream?)?
     }
     Ok(())
 }
 
 // handler for client request
-fn handle_connect(stream: TcpStream, logger: slog::Logger) -> std::io::Result<()> {
+fn handle_connect(stream: TcpStream) -> std::io::Result<()> {
     let client_addr = stream.peer_addr()?;
-
 
     Ok(())
 }
