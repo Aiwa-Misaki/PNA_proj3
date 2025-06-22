@@ -17,5 +17,3 @@ pub enum KvsError {
 }
 
 
-/// alias for Result<T, KvsError>
-pub type Result<T> = std::result::Result<T, KvsError>;

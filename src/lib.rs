@@ -3,13 +3,10 @@
 //! This crate provides a simple key-value store implementation.
 // #![deny(missing_docs)]
 mod client;
-
-pub mod common;
+mod server;
 pub mod engines;
 pub mod error;
-mod server;
+pub mod common;
 
 pub use engines::{KvStore, KvsEngine, SledKvsEngine};
-
-pub use error::Result;
 

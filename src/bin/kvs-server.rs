@@ -17,6 +17,7 @@ struct Cli {
 }
 
 fn main() -> std::io::Result<()> {
+    env_logger::init();
     let dir = env::current_dir()?;
     let mut kv = KvStore::open(dir.as_path()).unwrap();
 
@@ -32,16 +33,6 @@ fn main() -> std::io::Result<()> {
     info!("config {ip}:{port}, engine {engine}");
 
     // init TCP listener
-    let listener = TcpListener::bind(addr)?;
-    for stream in listener.incoming() {
-        handle_connect(stream?)?
-    }
     Ok(())
 }
 
-// handler for client request
-fn handle_connect(stream: TcpStream) -> std::io::Result<()> {
-    let client_addr = stream.peer_addr()?;
-
-    Ok(())
-}

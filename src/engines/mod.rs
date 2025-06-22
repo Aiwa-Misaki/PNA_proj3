@@ -1,13 +1,13 @@
-use crate::error::Result;
+use std::path::Path;
+
+use crate::error::KvsError;
 
 pub trait KvsEngine {
-    fn set(&mut self, key: String, value: String) -> Result<()>;
+    fn set(&mut self, key: String, value: String) -> Result<(), KvsError>;
 
-    /// get map[key]; if key not in map, then None
-    fn get(&mut self, key: String) -> Result<Option<String>>;
+    fn get(&self, key: String) -> Result<Option<String>, KvsError>;
 
-    /// remove k-v pair from map
-    fn remove(&mut self, key: String) -> Result<()>;
+    fn remove(&mut self, key: String) -> Result<(), KvsError>;
 }
 
 pub mod kvs;

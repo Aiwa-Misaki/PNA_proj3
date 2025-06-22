@@ -1,4 +1,5 @@
-use crate::error::{KvsError, Result};
+use crate::error::KvsError;
+use crate::KvsEngine;
 use buffered_offset_reader::{BufOffsetReader, OffsetReadMut};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -20,69 +21,9 @@ pub struct KvStore {
 }
 
 impl KvStore {
-    /// set map[key]=value; if key in map, then overwrite
-    pub fn set(&mut self, key: String, value: String) -> Result<()> {
-        let (offset, length) =
-            self.write_value_to_file(self.filepath.clone(), key.clone(), value.clone())?;
-
-        if self.map.insert(key, (offset, length)) != None {
-            self.redundant += 1;
-        };
-
-        self.compact_log();
-
-        Ok(())
-    }
-
-    /// get map[key]; if key not in map, then None
-    pub fn get(&mut self, key: String) -> Result<Option<String>> {
-        // println!("222{:?}", self.filepath.clone());
-        if self.map.contains_key(&key) {
-            let offset = self.map[&key].0;
-            let length = self.map[&key].1;
-
-            self.get_value_from_file(offset, length)
-        } else {
-            Ok(None)
-        }
-    }
-
-    /// remove k-v pair from map
-    pub fn remove(&mut self, key: String) -> Result<()> {
-        if !self.map.contains_key(&key) {
-            return Err(KvsError::RmKeyError("Key not found".to_string()));
-        }
-
-        let log = Log {
-            op: OpType::Remove,
-            key: key.clone(),
-            value: "".to_string(),
-        };
-        let mut serialized = serde_json::to_string(&log)?;
-        let data_file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(self.filepath.as_path())?;
-
-        let mut data_file = LineWriter::new(data_file);
-
-        // Write to a file
-        serialized += "\n";
-        data_file.write(serialized.as_bytes())?;
-        data_file.flush()?;
-
-        self.map.remove(&key);
-
-        self.redundant += 1;
-
-        self.compact_log();
-
-        Ok(())
-    }
-
     /// function to read log file and load to hash map in memory
     /// used both in open and get(?)
-    fn read_to_map(&mut self) -> Result<()> {
+    fn read_to_map(&mut self) -> Result<(), KvsError> {
         self.map.clear();
         if !self.filepath.exists() {
             return Ok(());
@@ -114,7 +55,7 @@ impl KvStore {
 
     /// open a file in disk as KvStore
     /// now only record value in map
-    pub fn open(path: &Path) -> Result<Self> {
+    pub fn open(path: &Path) -> Result<Self, KvsError> {
         let filename = "store.log";
         let mut filepath = path.to_path_buf();
         if filepath.is_dir() {
@@ -136,7 +77,7 @@ impl KvStore {
         filepath: PathBuf,
         key: String,
         value: String,
-    ) -> Result<(u64, usize)> {
+    ) -> Result<(u64, usize), KvsError> {
         let log = Log {
             op: OpType::Set,
             key: key.clone(),
@@ -163,7 +104,7 @@ impl KvStore {
         Ok((offset, length))
     }
 
-    fn get_value_from_file(&self, offset: u64, length: usize) -> Result<Option<String>> {
+    fn get_value_from_file(&self, offset: u64, length: usize) -> Result<Option<String>, KvsError> {
         let file = OpenOptions::new()
             .read(true)
             .open(self.filepath.as_path())?;
@@ -220,6 +161,68 @@ impl KvStore {
     }
 }
 
+impl KvsEngine for KvStore {
+    /// set map[key]=value; if key in map, then overwrite
+    fn set(&mut self, key: String, value: String) -> Result<(), KvsError> {
+        let (offset, length) =
+            self.write_value_to_file(self.filepath.clone(), key.clone(), value.clone())?;
+
+        if self.map.insert(key, (offset, length)) != None {
+            self.redundant += 1;
+        };
+
+        self.compact_log();
+
+        Ok(())
+    }
+
+    /// get map[key]; if key not in map, then None
+    fn get(&self, key: String) -> Result<Option<String>, KvsError> {
+        // println!("222{:?}", self.filepath.clone());
+        if self.map.contains_key(&key) {
+            let offset = self.map[&key].0;
+            let length = self.map[&key].1;
+
+            self.get_value_from_file(offset, length)
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// remove k-v pair from map
+    fn remove(&mut self, key: String) -> Result<(), KvsError> {
+        if !self.map.contains_key(&key) {
+            return Err(KvsError::RmKeyError("Key not found".to_string()));
+        }
+
+        let log = Log {
+            op: OpType::Remove,
+            key: key.clone(),
+            value: "".to_string(),
+        };
+        let mut serialized = serde_json::to_string(&log)?;
+        let data_file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(self.filepath.as_path())?;
+
+        let mut data_file = LineWriter::new(data_file);
+
+        // Write to a file
+        serialized += "\n";
+        data_file.write(serialized.as_bytes())?;
+        data_file.flush()?;
+
+        self.map.remove(&key);
+
+        self.redundant += 1;
+
+        self.compact_log();
+
+        Ok(())
+    }
+}
+
 // used to represent operation in log
 #[derive(Serialize, Deserialize, Debug)]
 enum OpType {
@@ -234,3 +237,4 @@ struct Log {
     key: String,
     value: String,
 }
+

@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 use kvs::common;
 use log::{info, warn};
 use std::env;
+use std::io::prelude::*;
 use std::io::{BufRead, Write};
 use std::net::SocketAddr;
 use std::net::TcpStream;
@@ -25,6 +26,8 @@ enum Commands {
 }
 
 fn main() {
+    env_logger::init();
+
     let cli = Cli::parse();
     let dir = env::current_dir().unwrap();
 
@@ -39,7 +42,6 @@ fn main() {
     info!("config:{ip}:{port}");
 
     // init a TcpStream
-    let mut stream = TcpStream::connect(cli.addr);
-
-    // parse command
+    let mut stream = TcpStream::connect(cli.addr).expect("failed to connect to given addr");
+    stream.write(b"op={cli.command},key={1},value={2}");
 }
