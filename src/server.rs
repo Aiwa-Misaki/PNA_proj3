@@ -1,13 +1,11 @@
 use std::net::{SocketAddr, TcpListener, TcpStream};
 
 use log::info;
-use serde::{Deserialize, Serialize};
 
-use crate::{common, engines::sled, error::KvsError, KvStore, KvsEngine, SledKvsEngine};
+use crate::{common, error::KvsError, KvsEngine};
 
 pub struct Server {
     engine: Box<dyn KvsEngine>,
-    addr: SocketAddr,
     listener: TcpListener,
 }
 
@@ -18,17 +16,14 @@ impl Server {
     /// * `addr`: socket addr to conn to
     pub fn new(engine: Box<dyn KvsEngine>, addr: SocketAddr) -> Result<Self, KvsError> {
         let listener = TcpListener::bind(addr).map_err(KvsError::IOError)?;
-        Ok(Server {
-            engine,
-            addr,
-            listener,
-        })
+        Ok(Server { engine, listener })
     }
 
     /// Start handling connection.
     pub fn run(&mut self) -> Result<(), KvsError> {
-        for stream in self.listener.incoming() {
-            self.handle_connect(stream?);
+        let stream = self.listener.try_clone()?;
+        for s in stream.incoming() {
+            self.handle_connect(s?)?;
         }
         Ok(())
     }
@@ -45,12 +40,12 @@ impl Server {
             .expect("fail to get addr of incoming request");
         info!("receiving connection from {client_addr}");
 
-        let req: Request = serde_json::from_reader(&stream)?;
+        let req: common::Request = serde_json::from_reader(&stream)?;
 
-        let mut resp: common::Response = common::Response::Success;
+        let mut resp: common::Response;
 
         match req.op {
-            OpType::Set => {
+            common::OpType::Set => {
                 let res = self.engine.set(req.key, req.value);
                 match res {
                     Ok(()) => {
@@ -61,7 +56,7 @@ impl Server {
                     }
                 }
             }
-            OpType::Remove => {
+            common::OpType::Remove => {
                 let res = self.engine.remove(req.key);
                 match res {
                     Ok(()) => {
@@ -72,7 +67,7 @@ impl Server {
                     }
                 }
             }
-            OpType::Get => {
+            common::OpType::Get => {
                 let res = self.engine.get(req.key);
                 match res {
                     Ok(s) => {
@@ -87,20 +82,4 @@ impl Server {
         serde_json::to_writer(&stream, &resp)?;
         Ok(())
     }
-}
-
-// Seems same as engine-layer struct
-// But shouldn't share structure, so copied code here.
-#[derive(Serialize, Deserialize, Debug)]
-enum OpType {
-    Set,
-    Remove,
-    Get,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct Request {
-    op: OpType,
-    key: String,
-    value: String,
 }

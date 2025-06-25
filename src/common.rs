@@ -2,9 +2,25 @@ use std::net::SocketAddr;
 
 use serde::{Deserialize, Serialize};
 
-pub fn validate_address(addr: &str) -> Result<SocketAddr, String> {
-    let socket: SocketAddr = addr.parse().expect("invalid ip address");
+use crate::error::KvsError;
+
+pub fn validate_address(addr: &str) -> Result<SocketAddr, KvsError> {
+    let socket: SocketAddr = addr.parse().map_err(KvsError::AddrError)?;
     Ok(socket)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum OpType {
+    Get,
+    Set,
+    Remove,
+}
+
+#[derive(Serialize,Deserialize,Debug)]
+pub struct Request {
+    pub op: OpType,
+    pub key: String,
+    pub value: String
 }
 
 // for client-server communication

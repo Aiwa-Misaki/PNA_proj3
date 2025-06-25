@@ -1,12 +1,15 @@
 use clap::builder::{Str, TypedValueParser};
 use clap::{Parser, Subcommand};
-use kvs::common;
+use kvs::client::Client;
+use kvs::common::{validate_address, OpType};
+use kvs::error::KvsError;
 use log::{info, warn};
-use std::env;
 use std::io::prelude::*;
 use std::io::{BufRead, Write};
 use std::net::SocketAddr;
 use std::net::TcpStream;
+use std::str::FromStr;
+use std::{clone, env};
 
 #[derive(Parser)]
 #[command(version)]
@@ -25,23 +28,29 @@ enum Commands {
     Rm { key: String },
 }
 
-fn main() {
+fn main() -> Result<(), KvsError> {
     env_logger::init();
 
     let cli = Cli::parse();
-    let dir = env::current_dir().unwrap();
 
     // validate arg
-    let socket = common::validate_address(&cli.addr).unwrap_or_else(|_| {
-        panic!(
-            "connect addr invalid, should be ip:PORT, got {}",
-            cli.addr.clone()
-        )
-    });
+    let socket = validate_address(&cli.addr)?;
     let (ip, port) = (socket.ip(), socket.port());
     info!("config:{ip}:{port}");
 
+    let mut client = Client::new(socket);
+
     // init a TcpStream
-    let mut stream = TcpStream::connect(cli.addr).expect("failed to connect to given addr");
-    stream.write(b"op={cli.command},key={1},value={2}");
+    match cli.command {
+        Commands::Set { key, value } => {
+            client.runCmd(OpType::Set, key, value);
+        }
+        Commands::Get { key } => {
+            client.runCmd(OpType::Get, key, "".to_string());
+        }
+        Commands::Rm { key } => {
+            client.runCmd(OpType::Remove, key, "".to_string());
+        }
+    }
+    Ok(())
 }

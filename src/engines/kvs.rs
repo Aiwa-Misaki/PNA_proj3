@@ -55,7 +55,7 @@ impl KvStore {
 
     /// open a file in disk as KvStore
     /// now only record value in map
-    pub fn open(path: &Path) -> Result<Self, KvsError> {
+    pub fn open(path: &PathBuf) -> Result<Self, KvsError> {
         let filename = "store.log";
         let mut filepath = path.to_path_buf();
         if filepath.is_dir() {
@@ -177,7 +177,7 @@ impl KvsEngine for KvStore {
     }
 
     /// get map[key]; if key not in map, then None
-    fn get(&self, key: String) -> Result<Option<String>, KvsError> {
+    fn get(& self, key: String) -> Result<Option<String>, KvsError> {
         // println!("222{:?}", self.filepath.clone());
         if self.map.contains_key(&key) {
             let offset = self.map[&key].0;

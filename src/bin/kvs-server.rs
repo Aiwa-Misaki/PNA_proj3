@@ -1,7 +1,10 @@
 use clap::ArgAction::Version;
 use clap::{Parser, Subcommand};
-use kvs::common;
 use kvs::engines::kvs::KvStore;
+use kvs::engines::sled;
+use kvs::error::KvsError;
+use kvs::server::Server;
+use kvs::{common, KvsEngine, SledKvsEngine};
 use log::{info, log};
 use std::env;
 use std::net::{TcpListener, TcpStream};
@@ -16,10 +19,9 @@ struct Cli {
     engine: String,
 }
 
-fn main() -> std::io::Result<()> {
+fn main() -> Result<(), KvsError> {
     env_logger::init();
     let dir = env::current_dir()?;
-    let mut kv = KvStore::open(dir.as_path()).unwrap();
 
     // parse command
     let cli = Cli::parse();
@@ -33,6 +35,15 @@ fn main() -> std::io::Result<()> {
     info!("config {ip}:{port}, engine {engine}");
 
     // init TCP listener
+    let engine_instance: Box<dyn KvsEngine> = match engine.as_str() {
+        "sled" => Box::new(SledKvsEngine::open(&dir)?),
+        "kvs" => Box::new(KvStore::open(&dir)?),
+        other => return Err(KvsError::UnknownEngineError(other.to_string())),
+    };
+
+    let mut server = Server::new(engine_instance, socket)?;
+
+    server.run();
+
     Ok(())
 }
-
