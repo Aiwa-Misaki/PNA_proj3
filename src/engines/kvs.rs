@@ -1,13 +1,14 @@
 use crate::error::KvsError;
 use crate::KvsEngine;
 use buffered_offset_reader::{BufOffsetReader, OffsetReadMut};
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::fs::{read_to_string, File, OpenOptions};
 use std::io::{LineWriter, Write};
 use std::ops::Add;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// KvStore as a memory store struct
 pub struct KvStore {
@@ -37,7 +38,7 @@ impl KvStore {
         let mut offset = 0;
 
         for log in result.iter() {
-            let deserialized: Log = serde_json::from_str(&log)?;
+            let deserialized: Log = serde_json::from_str(log)?;
             let length = log.len();
             match deserialized.op {
                 OpType::Set => {
@@ -69,6 +70,7 @@ impl KvStore {
 
         kv.read_to_map()?;
 
+        info!("[kvstore] opened kv successfully, path {:?}", path);
         Ok(kv)
     }
 
@@ -94,12 +96,16 @@ impl KvStore {
 
         // Write to a file
         serialized += "\n";
-        file.write(serialized.as_bytes())?;
+        file.write_all(serialized.as_bytes())?;
         file.flush()?;
 
         file.get_ref().sync_data()?;
 
         let length = serialized.len();
+        info!(
+            "[kvstore] wrote to file, offset={}, length={}",
+            offset, length
+        );
 
         Ok((offset, length))
     }
@@ -132,7 +138,7 @@ impl KvStore {
         let mut old_path = self.filepath.clone();
         self.read_to_map().unwrap();
         old_path.pop();
-        old_path.push("store_new.log".to_string());
+        old_path.push("store_new.log");
 
         File::create(old_path.clone()).expect("create failed");
 
@@ -158,6 +164,8 @@ impl KvStore {
         self.map = map_new;
 
         self.redundant = 0;
+
+        info!("[kvstore] log compression finished.")
     }
 }
 
@@ -167,24 +175,29 @@ impl KvsEngine for KvStore {
         let (offset, length) =
             self.write_value_to_file(self.filepath.clone(), key.clone(), value.clone())?;
 
-        if self.map.insert(key, (offset, length)) != None {
+        if self.map.insert(key.clone(), (offset, length)).is_some() {
             self.redundant += 1;
         };
 
         self.compact_log();
 
+        info!("[kvstore] finished set {} {}", &key, &value);
+
         Ok(())
     }
 
     /// get map[key]; if key not in map, then None
-    fn get(& self, key: String) -> Result<Option<String>, KvsError> {
+    fn get(&self, key: String) -> Result<Option<String>, KvsError> {
         // println!("222{:?}", self.filepath.clone());
         if self.map.contains_key(&key) {
             let offset = self.map[&key].0;
             let length = self.map[&key].1;
 
-            self.get_value_from_file(offset, length)
+            let value = self.get_value_from_file(offset, length);
+            info!("[kvstore] finished get {}, value={:?}", &key, &value);
+            value
         } else {
+            info!("[kvstore] finished get {}, value not found", &key);
             Ok(None)
         }
     }
@@ -192,6 +205,7 @@ impl KvsEngine for KvStore {
     /// remove k-v pair from map
     fn remove(&mut self, key: String) -> Result<(), KvsError> {
         if !self.map.contains_key(&key) {
+            info!("[kvstore] key {} to remove not found", &key);
             return Err(KvsError::RmKeyError("Key not found".to_string()));
         }
 
@@ -210,7 +224,7 @@ impl KvsEngine for KvStore {
 
         // Write to a file
         serialized += "\n";
-        data_file.write(serialized.as_bytes())?;
+        data_file.write_all(serialized.as_bytes())?;
         data_file.flush()?;
 
         self.map.remove(&key);
@@ -218,6 +232,8 @@ impl KvsEngine for KvStore {
         self.redundant += 1;
 
         self.compact_log();
+
+        info!("[kvstore] finished remove {}", &key);
 
         Ok(())
     }
@@ -237,4 +253,3 @@ struct Log {
     key: String,
     value: String,
 }
-

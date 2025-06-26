@@ -1,13 +1,10 @@
-use clap::ArgAction::Version;
-use clap::{Parser, Subcommand};
+use log::info;
+use clap::Parser;
 use kvs::engines::kvs::KvStore;
-use kvs::engines::sled;
 use kvs::error::KvsError;
 use kvs::server::Server;
 use kvs::{common, KvsEngine, SledKvsEngine};
-use log::{info, log};
 use std::env;
-use std::net::{TcpListener, TcpStream};
 
 #[derive(Parser)] // derive Parser trait
 #[command(version)] // add -V --version option
@@ -32,7 +29,7 @@ fn main() -> Result<(), KvsError> {
     // parse IP port
     let socket = common::validate_address(&addr).expect("invalid ip address");
     let (ip, port) = (socket.ip(), socket.port());
-    info!("config {ip}:{port}, engine {engine}");
+    info!("[kvs-server] config {ip}:{port}, engine {engine}");
 
     // init TCP listener
     let engine_instance: Box<dyn KvsEngine> = match engine.as_str() {
@@ -43,7 +40,7 @@ fn main() -> Result<(), KvsError> {
 
     let mut server = Server::new(engine_instance, socket)?;
 
-    server.run();
+    server.run()?;
 
     Ok(())
 }

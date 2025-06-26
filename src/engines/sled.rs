@@ -1,5 +1,5 @@
 use crate::{error::KvsError, KvsEngine};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 extern crate sled as sled_crate;
 
 pub struct SledKvsEngine {

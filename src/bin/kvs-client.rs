@@ -1,15 +1,8 @@
-use clap::builder::{Str, TypedValueParser};
 use clap::{Parser, Subcommand};
 use kvs::client::Client;
 use kvs::common::{validate_address, OpType};
 use kvs::error::KvsError;
-use log::{info, warn};
-use std::io::prelude::*;
-use std::io::{BufRead, Write};
-use std::net::SocketAddr;
-use std::net::TcpStream;
-use std::str::FromStr;
-use std::{clone, env};
+use log::info;
 
 #[derive(Parser)]
 #[command(version)]
@@ -43,13 +36,13 @@ fn main() -> Result<(), KvsError> {
     // init a TcpStream
     match cli.command {
         Commands::Set { key, value } => {
-            client.runCmd(OpType::Set, key, value);
+            client.run_cmd(OpType::Set, key, value)?;
         }
         Commands::Get { key } => {
-            client.runCmd(OpType::Get, key, "".to_string());
+            client.run_cmd(OpType::Get, key, "".to_string())?;
         }
         Commands::Rm { key } => {
-            client.runCmd(OpType::Remove, key, "".to_string());
+            client.run_cmd(OpType::Remove, key, "".to_string())?;
         }
     }
     Ok(())
